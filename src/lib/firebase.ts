@@ -21,16 +21,3 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
-
-import { collection, doc, setDoc } from 'firebase/firestore';
-
-// Initialize collections
-const collectionsToCreate = ['videos', 'likes', 'comments'];
-collectionsToCreate.forEach(async (collectionName) => {
-  const dummyDoc = doc(collection(db, collectionName), 'dummy');
-  try {
-    await setDoc(dummyDoc, { init: true });
-  } catch (error) {
-    console.error(`Error creating collection ${collectionName}:`, error);
-  }
-});

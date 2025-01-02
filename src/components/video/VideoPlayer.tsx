@@ -3,57 +3,79 @@ import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import VideoInteraction from './VideoInteraction';
 import Link from 'next/link';
+import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { sampleVideo, getSampleVideoViews, incrementSampleVideoViews, viewsEmitter } from '@/utils/sampleVideo';
 
 interface VideoPlayerProps {
   videoId: string;
 }
-
-const defaultVideos = [
-  {
-    id: '1',
-    title: 'Big Buck Bunny',
-    userName: 'Blender Foundation',
-    userId: 'blender1',
-    createdAt: new Date().toISOString(),
-    views: 1520,
-    thumbnailUrl: 'https://via.placeholder.com/640x360/123456/ffffff?text=Big+Buck+Bunny',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    description: 'Big Buck Bunny tells the story of a giant rabbit with a heart bigger than himself.'
-  },
-  {
-    id: '2',
-    title: 'Nature Relaxation',
-    userName: 'Nature Channel',
-    userId: 'nature1',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    views: 892,
-    thumbnailUrl: 'https://via.placeholder.com/640x360/654321/ffffff?text=Nature+Video',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-    description: 'Relax with this beautiful nature footage.'
-  },
-  {
-    id: '3',
-    title: 'Tech Tutorial',
-    userName: 'Tech Guru',
-    userId: 'tech1',
-    createdAt: new Date(Date.now() - 172800000).toISOString(),
-    views: 2341,
-    thumbnailUrl: 'https://via.placeholder.com/640x360/234567/ffffff?text=Tech+Tutorial',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    description: 'Learn the latest technology trends.'
-  }
-];
 
 export default function VideoPlayer({ videoId }: VideoPlayerProps) {
   const [videoData, setVideoData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const video = defaultVideos.find(v => v.id === videoId);
-    if (video) {
-      setVideoData(video);
-    }
-    setLoading(false);
+    if (!viewsEmitter) return;
+
+    const updateViews = (newViews: number) => {
+      if (videoData?.id === 'sample_video') {
+        setVideoData(prev => ({ ...prev, views: newViews }));
+      }
+    };
+
+    viewsEmitter.on('viewsUpdated', updateViews);
+    return () => {
+      viewsEmitter.off('viewsUpdated', updateViews);
+    };
+  }, [videoData?.id]);
+
+  useEffect(() => {
+    const fetchVideo = async () => {
+      const hasViewIncremented = sessionStorage.getItem(`video_view_${videoId}`);
+      
+      if (videoId === 'sample_video') {
+        if (!hasViewIncremented) {
+          const newViews = incrementSampleVideoViews();
+          sessionStorage.setItem(`video_view_${videoId}`, 'true');
+          setVideoData({
+            ...sampleVideo,
+            views: newViews
+          });
+        } else {
+          setVideoData({
+            ...sampleVideo,
+            views: getSampleVideoViews()
+          });
+        }
+        setLoading(false);
+        return;
+      }
+
+      const videoRef = doc(db, 'videos', videoId);
+      const videoDoc = await getDoc(videoRef);
+      
+      if (videoDoc.exists()) {
+        const video = { id: videoDoc.id, ...videoDoc.data() };
+        
+        if (!hasViewIncremented) {
+          await updateDoc(videoRef, {
+            views: increment(1)
+          });
+          sessionStorage.setItem(`video_view_${videoId}`, 'true');
+          setVideoData({
+            ...video,
+            views: (video.views || 0) + 1
+          });
+        } else {
+          setVideoData(video);
+        }
+      }
+      
+      setLoading(false);
+    };
+
+    fetchVideo();
   }, [videoId]);
 
   if (loading) {
@@ -101,7 +123,7 @@ export default function VideoPlayer({ videoId }: VideoPlayerProps) {
               </Link>
               <span className="text-sm text-gray-500">•</span>
               <span className="text-sm text-gray-500">
-                {videoData.views.toLocaleString()} views
+                {videoData.views?.toLocaleString()} views
               </span>
               <span className="text-sm text-gray-500">•</span>
               <span className="text-sm text-gray-500">

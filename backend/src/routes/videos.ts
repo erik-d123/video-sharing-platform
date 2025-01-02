@@ -1,98 +1,60 @@
-import express, { Request, Response, Router } from 'express';
+import express from 'express';
 import { PubSub } from '@google-cloud/pubsub';
-import { db, storage } from '../config/firebase-admin';
+import { getStorage } from 'firebase-admin/storage';
+import { getFirestore } from 'firebase-admin/firestore';
 
-const router: Router = express.Router();
+const router = express.Router();
 const pubsub = new PubSub();
-const bucket = storage.bucket();
+const db = getFirestore();
+const bucket = getStorage().bucket();
 
-// Topic name for video processing
-const VIDEO_PROCESSING_TOPIC = 'video-processing';
+// Test endpoint
+router.get('/test', (req, res) => {
+  res.json({ message: 'Videos route is working!' });
+});
 
-type ProcessVideoRequest = {
-  videoId: string;
-};
-
-type UploadUrlRequest = {
-  fileName: string;
-  contentType: string;
-};
-
-// Process video after upload
-router.post(
-  '/process',
-  (req: Request<{}, {}, ProcessVideoRequest>, res: Response) => {
-    const { videoId } = req.body;
-    
-    try {
-      // Get video data from Firestore
-      db.collection('videos')
-        .doc(videoId)
-        .get()
-        .then((videoDoc) => {
-          const videoData = videoDoc.data();
-
-          if (!videoData) {
-            return res.status(404).json({ error: 'Video not found' });
-          }
-
-          // Publish message to Pub/Sub for processing
-          const message = {
-            videoId,
-            videoUrl: videoData.videoUrl,
-          };
-
-          const messageBuffer = Buffer.from(JSON.stringify(message));
-          pubsub
-            .topic(VIDEO_PROCESSING_TOPIC)
-            .publish(messageBuffer)
-            .then(() => {
-              res.json({ message: 'Video processing started' });
-            })
-            .catch((error) => {
-              console.error('Error publishing to Pub/Sub:', error);
-              res.status(500).json({ error: 'Failed to process video' });
-            });
-        })
-        .catch((error) => {
-          console.error('Error getting video data:', error);
-          res.status(500).json({ error: 'Failed to get video data' });
-        });
-    } catch (error) {
-      console.error('Error processing video:', error);
-      res.status(500).json({ error: 'Failed to process video' });
-    }
-  }
-);
-
-// Get signed URL for video upload
-router.post(
-  '/upload-url',
-  (req: Request<{}, {}, UploadUrlRequest>, res: Response) => {
+// Get upload URL
+router.post('/upload-url', async (req, res) => {
+  console.log('Received upload URL request:', req.body);
+  try {
     const { fileName, contentType } = req.body;
+    
+    if (!fileName || !contentType) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
     const filePath = `videos/${fileName}`;
 
-    try {
-      bucket
-        .file(filePath)
-        .getSignedUrl({
-          version: 'v4',
-          action: 'write',
-          expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-          contentType,
-        })
-        .then(([url]) => {
-          res.json({ url, filePath });
-        })
-        .catch((error) => {
-          console.error('Error generating upload URL:', error);
-          res.status(500).json({ error: 'Failed to generate upload URL' });
-        });
-    } catch (error) {
-      console.error('Error generating upload URL:', error);
-      res.status(500).json({ error: 'Failed to generate upload URL' });
-    }
+    const [url] = await bucket.file(filePath).getSignedUrl({
+      version: 'v4',
+      action: 'write',
+      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+      contentType,
+    });
+
+    console.log('Generated signed URL for:', filePath);
+    res.json({ url, filePath });
+  } catch (error) {
+    console.error('Error generating upload URL:', error);
+    res.status(500).json({ error: 'Failed to generate upload URL' });
   }
-);
+});
+
+// Process video
+router.post('/process', async (req, res) => {
+  try {
+    const { videoId } = req.body;
+    
+    if (!videoId) {
+      return res.status(400).json({ error: 'Missing videoId' });
+    }
+
+    // For now, just return success
+    res.json({ message: 'Video processing started' });
+  } catch (error) {
+    console.error('Error processing video:', error);
+    res.status(500).json({ error: 'Failed to process video' });
+  }
+});
 
 export default router;

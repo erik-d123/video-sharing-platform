@@ -1,9 +1,10 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, addDoc } from 'firebase/firestore';
-import { storage, db } from '@/lib/firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase';
 
 export default function UploadForm() {
  const [file, setFile] = useState<File | null>(null);
@@ -15,7 +16,6 @@ export default function UploadForm() {
  const [progress, setProgress] = useState(0);
  const [error, setError] = useState('');
  const [thumbnailPreview, setThumbnailPreview] = useState<string>('');
- const videoRef = useRef<HTMLVideoElement>(null);
  
  const router = useRouter();
  const { user } = useAuth();
@@ -27,7 +27,6 @@ export default function UploadForm() {
      const ctx = canvas.getContext('2d');
 
      video.onloadedmetadata = () => {
-       // Generate thumbnail at 25% of the video duration
        video.currentTime = video.duration * 0.25;
      };
 
@@ -69,25 +68,6 @@ export default function UploadForm() {
    }
  };
 
- const getUploadUrl = async (fileName: string, contentType: string) => {
-   try {
-     const response = await fetch('http://localhost:3001/api/videos/upload-url', {
-       method: 'POST',
-       headers: {
-         'Content-Type': 'application/json',
-       },
-       body: JSON.stringify({ fileName, contentType }),
-     });
-     if (!response.ok) {
-       throw new Error('Failed to get upload URL');
-     }
-     return response.json();
-   } catch (error) {
-     console.error('Error getting upload URL:', error);
-     throw error;
-   }
- };
-
  const handleSubmit = async (e: React.FormEvent) => {
    e.preventDefault();
    if (!file || !user || !thumbnail) return;
@@ -96,67 +76,75 @@ export default function UploadForm() {
      setUploading(true);
      setError('');
 
-     // Generate unique filenames
-     const videoExtension = file.name.split('.').pop();
-     const videoFileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${videoExtension}`;
-     const thumbnailFileName = `thumbnail-${videoFileName.split('.')[0]}.jpg`;
-     
      // Upload video
-     const { url: videoUrl, filePath: videoPath } = await getUploadUrl(videoFileName, file.type);
-     await fetch(videoUrl, {
-       method: 'PUT',
-       body: file,
-       headers: {
-         'Content-Type': file.type,
+     const videoStorageRef = ref(storage, `videos/${Date.now()}-${file.name}`);
+     const videoUploadTask = uploadBytesResumable(videoStorageRef, file);
+
+     videoUploadTask.on(
+       'state_changed',
+       (snapshot) => {
+         const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+         setProgress(progress);
        },
-     });
-
-     // Upload thumbnail
-     const { url: thumbnailUrl, filePath: thumbnailPath } = await getUploadUrl(thumbnailFileName, thumbnail.type);
-     await fetch(thumbnailUrl, {
-       method: 'PUT',
-       body: thumbnail,
-       headers: {
-         'Content-Type': thumbnail.type,
+       (error) => {
+         console.error('Upload error:', error);
+         setError('Failed to upload video');
+         setUploading(false);
        },
-     });
+       async () => {
+         // Get video URL
+         const videoUrl = await getDownloadURL(videoUploadTask.snapshot.ref);
 
-     // Save metadata to Firestore
-     const videoData = {
-       title,
-       description,
-       videoUrl: `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/${videoPath}`,
-       thumbnailUrl: `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/${thumbnailPath}`,
-       userId: user.uid,
-       userName: user.displayName || user.email,
-       createdAt: new Date().toISOString(),
-       views: 0,
-       likes: 0,
-       status: 'processing'
-     };
+         // Upload thumbnail
+         const thumbnailStorageRef = ref(storage, `thumbnails/${Date.now()}-${file.name}-thumb.jpg`);
+         const thumbnailUploadTask = uploadBytesResumable(thumbnailStorageRef, thumbnail);
 
-     const docRef = await addDoc(collection(db, 'videos'), videoData);
+         thumbnailUploadTask.on(
+           'state_changed',
+           (snapshot) => {
+             // You could add separate progress for thumbnail if needed
+           },
+           (error) => {
+             console.error('Thumbnail upload error:', error);
+             setError('Failed to upload thumbnail');
+             setUploading(false);
+           },
+           async () => {
+             // Get thumbnail URL
+             const thumbnailUrl = await getDownloadURL(thumbnailUploadTask.snapshot.ref);
 
-     // Trigger video processing
-     await fetch('http://localhost:3001/api/videos/process', {
-       method: 'POST',
-       headers: {
-         'Content-Type': 'application/json',
-       },
-       body: JSON.stringify({ videoId: docRef.id }),
-     });
+             // Save video metadata to Firestore
+             await addDoc(collection(db, 'videos'), {
+               title,
+               description,
+               videoUrl,
+               thumbnailUrl,
+               userId: user.uid,
+               userName: user.displayName || user.email,
+               createdAt: new Date().toISOString(),
+               views: 0,
+               likes: 0,
+               dislikes: 0,
+               status: 'ready'
+             });
 
-     setUploading(false);
-     router.push('/');
+             setUploading(false);
+             router.push('/');
+           }
+         );
+       }
+     );
    } catch (err) {
+     console.error('Upload error:', err);
      setError(err instanceof Error ? err.message : 'Upload failed');
      setUploading(false);
-     console.error('Upload error:', err);
    }
  };
 
  return (
    <div className="max-w-2xl mx-auto p-4">
+     <h1 className="text-2xl font-bold mb-6">Upload Video</h1>
+     
      {error && (
        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
          {error}

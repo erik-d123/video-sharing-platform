@@ -35,10 +35,10 @@ export default function Navigation() {
                    className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
                  >
                    <img 
-                     src={user.photoURL || 'https://via.placeholder.com/32'} 
-                     alt={user.displayName || user.email || 'User'} 
-                     className="w-8 h-8 rounded-full"
-                   />
+                    src={user.photoURL || '/default-avatar.png'} // You can update this to any default image URL
+                    alt={user.displayName || user.email || 'User'} 
+                    className="w-8 h-8 rounded-full bg-gray-200"
+                  />
                    <span className="text-sm text-gray-700">{user.displayName || user.email?.split('@')[0]}</span>
                  </Link>
                  <button

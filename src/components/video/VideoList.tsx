@@ -1,58 +1,19 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import VideoCard from './VideoCard';
+import { sampleVideo, getSampleVideoViews, viewsEmitter } from '@/utils/sampleVideo';
 
 interface Video {
   id: string;
   title: string;
   userName: string;
-  userId: string;
   createdAt: string;
   views: number;
-  likes: number;
   thumbnailUrl?: string;
   videoUrl: string;
-  description: string;
 }
-
-const defaultVideos: Video[] = [
-  {
-    id: '1',
-    title: 'Jungle Sunset Safari',
-    userName: 'Wildlife Explorer',
-    userId: 'wildlife1',
-    createdAt: new Date().toISOString(),
-    views: 1520,
-    likes: 450,
-    thumbnailUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/TearsOfSteel.jpg',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-    description: 'Experience a breathtaking sunset safari through the African jungle, featuring rare wildlife in their natural habitat.'
-  },
-  {
-    id: '2',
-    title: 'Snowboarding the Alps',
-    userName: 'Extreme Sports',
-    userId: 'sports1',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    views: 892,
-    likes: 220,
-    thumbnailUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/Sintel.jpg',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
-    description: 'Professional snowboarder tackles the most challenging slopes in the Swiss Alps. Pure adrenaline and stunning mountain views.'
-  },
-  {
-    id: '3',
-    title: 'Urban Parkour Challenge',
-    userName: 'City Runners',
-    userId: 'parkour1',
-    createdAt: new Date(Date.now() - 172800000).toISOString(),
-    views: 2341,
-    likes: 890,
-    thumbnailUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/SubaruOutbackOnStreetAndDirt.jpg',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
-    description: 'Watch as expert parkour athletes navigate through urban obstacles in this high-energy compilation.'
-  }
-];
 
 interface VideoListProps {
   searchQuery?: string;
@@ -61,47 +22,114 @@ interface VideoListProps {
 }
 
 export default function VideoList({ searchQuery, userId, sortBy = 'recent' }: VideoListProps) {
-  const [videos, setVideos] = useState<Video[]>(defaultVideos);
-  const [filteredVideos, setFilteredVideos] = useState<Video[]>(videos);
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let result = [...videos];
+    if (!viewsEmitter) return;
 
-    if (searchQuery) {
-      result = result.filter(video => 
-        video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        video.description.toLowerCase().includes(searchQuery.toLowerCase())
+    const updateViews = (newViews: number) => {
+      setVideos(prevVideos => 
+        prevVideos.map(video => 
+          video.id === 'sample_video' 
+            ? { ...video, views: newViews }
+            : video
+        )
       );
-    }
+    };
 
-    if (userId) {
-      result = result.filter(video => video.userId === userId);
-    }
+    viewsEmitter.on('viewsUpdated', updateViews);
+    return () => {
+      viewsEmitter.off('viewsUpdated', updateViews);
+    };
+  }, []);
 
-    switch (sortBy) {
-      case 'views':
-        result.sort((a, b) => b.views - a.views);
-        break;
-      case 'likes':
-        result.sort((a, b) => b.likes - a.likes);
-        break;
-      default:
-        result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    }
+  useEffect(() => {
+    const fetchVideos = async () => {
+      try {
+        const videosRef = collection(db, 'videos');
+        const q = query(videosRef, orderBy('createdAt', 'desc'));
+        const querySnapshot = await getDocs(q);
+        
+        const uploadedVideos = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Video[];
 
-    setFilteredVideos(result);
-  }, [videos, searchQuery, userId, sortBy]);
+        const allVideos = [...uploadedVideos];
+        
+        if (uploadedVideos.length === 0) {
+          allVideos.push({
+            ...sampleVideo,
+            views: getSampleVideoViews()
+          });
+        }
+
+        let filteredVideos = allVideos;
+        if (searchQuery) {
+          filteredVideos = allVideos.filter(video =>
+            video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            video.userName.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+        }
+
+        if (userId) {
+          filteredVideos = filteredVideos.filter(video => video.userId === userId);
+        }
+
+        switch (sortBy) {
+          case 'views':
+            filteredVideos.sort((a, b) => (b.views || 0) - (a.views || 0));
+            break;
+          case 'likes':
+            filteredVideos.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+            break;
+          default:
+            filteredVideos.sort((a, b) => 
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+        }
+
+        setVideos(filteredVideos);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching videos:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchVideos();
+  }, [searchQuery, userId, sortBy]);
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="animate-pulse">
+            <div className="aspect-video bg-gray-200 rounded-lg"></div>
+            <div className="mt-4 space-y-2">
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {filteredVideos.map((video) => (
-        <VideoCard key={video.id} {...video} />
+      {videos.map((video) => (
+        <VideoCard
+          key={video.id}
+          id={video.id}
+          title={video.title}
+          userName={video.userName}
+          createdAt={video.createdAt}
+          views={video.views}
+          thumbnailUrl={video.thumbnailUrl}
+        />
       ))}
-      {filteredVideos.length === 0 && (
-        <div className="col-span-full text-center py-10">
-          <p className="text-gray-500">No videos found</p>
-        </div>
-      )}
     </div>
   );
 }

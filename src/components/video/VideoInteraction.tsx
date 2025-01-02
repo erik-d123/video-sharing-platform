@@ -28,6 +28,20 @@ export default function VideoInteraction({ videoId }: VideoInteractionProps) {
  const [comments, setComments] = useState<Comment[]>([]);
 
  useEffect(() => {
+   const initVideo = async () => {
+     const videoRef = doc(db, 'videos', videoId);
+     const videoDoc = await getDoc(videoRef);
+     if (!videoDoc.exists()) {
+       await setDoc(videoRef, {
+         likes: 0,
+         dislikes: 0,
+         createdAt: new Date().toISOString()
+       });
+     }
+   };
+   
+   initVideo();
+
    const videoRef = doc(db, 'videos', videoId);
    const unsubVideo = onSnapshot(videoRef, (doc) => {
      if (doc.exists()) {
@@ -83,6 +97,17 @@ export default function VideoInteraction({ videoId }: VideoInteractionProps) {
    const videoRef = doc(db, 'videos', videoId);
 
    try {
+     // First check if video document exists
+     const videoDoc = await getDoc(videoRef);
+     if (!videoDoc.exists()) {
+       // Create the video document if it doesn't exist
+       await setDoc(videoRef, {
+         likes: 0,
+         dislikes: 0,
+         createdAt: new Date().toISOString()
+       });
+     }
+
      if (liked) {
        await deleteDoc(likeRef);
        await updateDoc(videoRef, {
@@ -123,6 +148,17 @@ export default function VideoInteraction({ videoId }: VideoInteractionProps) {
    const videoRef = doc(db, 'videos', videoId);
 
    try {
+     // First check if video document exists
+     const videoDoc = await getDoc(videoRef);
+     if (!videoDoc.exists()) {
+       // Create the video document if it doesn't exist
+       await setDoc(videoRef, {
+         likes: 0,
+         dislikes: 0,
+         createdAt: new Date().toISOString()
+       });
+     }
+
      if (disliked) {
        await deleteDoc(dislikeRef);
        await updateDoc(videoRef, {

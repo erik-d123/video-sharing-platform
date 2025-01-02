@@ -1,8 +1,13 @@
 'use client';
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User, signOut, onAuthStateChanged } from 'firebase/auth';
+import { 
+  User,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+  GoogleAuthProvider
+} from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
-import { signInWithPopup } from 'firebase/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -22,6 +27,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!auth) return;
+    
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
@@ -40,7 +47,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function logout() {
-    await signOut(auth);
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Error signing out:', error);
+      throw error;
+    }
   }
 
   const value = {
