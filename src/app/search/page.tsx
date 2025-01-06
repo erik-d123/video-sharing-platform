@@ -1,3 +1,5 @@
+// src/app/search/page.tsx
+
 'use client';
 import { useSearchParams } from 'next/navigation';
 import VideoList from '@/components/video/VideoList';

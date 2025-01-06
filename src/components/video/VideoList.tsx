@@ -1,18 +1,18 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, getDocs, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import VideoCard from './VideoCard';
-import { sampleVideo, getSampleVideoViews, viewsEmitter } from '@/utils/sampleVideo';
+import { sampleVideo, getSampleVideoViews } from '@/utils/sampleVideo';
 
 interface Video {
   id: string;
   title: string;
   userName: string;
-  createdAt: string;
+  userId: string;
   views: number;
   thumbnailUrl?: string;
-  videoUrl: string;
+  likes?: number;
 }
 
 interface VideoListProps {
@@ -21,79 +21,75 @@ interface VideoListProps {
   sortBy?: string;
 }
 
-export default function VideoList({ searchQuery, userId, sortBy = 'recent' }: VideoListProps) {
+const VideoList = ({ searchQuery, userId, sortBy = 'recent' }: VideoListProps) => {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!viewsEmitter) return;
-
-    const updateViews = (newViews: number) => {
-      setVideos(prevVideos => 
-        prevVideos.map(video => 
-          video.id === 'sample_video' 
-            ? { ...video, views: newViews }
-            : video
-        )
-      );
-    };
-
-    viewsEmitter.on('viewsUpdated', updateViews);
-    return () => {
-      viewsEmitter.off('viewsUpdated', updateViews);
-    };
-  }, []);
-
-  useEffect(() => {
     const fetchVideos = async () => {
       try {
-        const videosRef = collection(db, 'videos');
-        const q = query(videosRef, orderBy('createdAt', 'desc'));
-        const querySnapshot = await getDocs(q);
-        
-        const uploadedVideos = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Video[];
+        let allVideos: Video[] = [];
 
-        const allVideos = [...uploadedVideos];
-        
-        if (uploadedVideos.length === 0) {
-          allVideos.push({
+        // Handle sample user profile
+        if (userId === 'sample1') {
+          allVideos = [{
             ...sampleVideo,
             views: getSampleVideoViews()
-          });
+          }];
+        } else if (userId) {
+          // Fetch user's videos
+          const videosRef = collection(db, 'videos');
+          const q = query(videosRef, where('userId', '==', userId));
+          const querySnapshot = await getDocs(q);
+          allVideos = querySnapshot.docs
+            .map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }))
+            .filter(video => video.title && video.userName) as Video[];
+        } else {
+          // Fetch all videos for main page
+          const videosRef = collection(db, 'videos');
+          const querySnapshot = await getDocs(videosRef);
+          allVideos = querySnapshot.docs
+            .map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }))
+            .filter(video => video.title && video.userName) as Video[];
+
+          // Add sample video if no videos exist
+          if (allVideos.length === 0 && !searchQuery) {
+            allVideos = [{
+              ...sampleVideo,
+              views: getSampleVideoViews()
+            }];
+          }
         }
 
-        let filteredVideos = allVideos;
+        // Apply search filter
         if (searchQuery) {
-          filteredVideos = allVideos.filter(video =>
-            video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            video.userName.toLowerCase().includes(searchQuery.toLowerCase())
+          const query = searchQuery.toLowerCase();
+          allVideos = allVideos.filter(video =>
+            video.title.toLowerCase().includes(query) ||
+            video.userName.toLowerCase().includes(query)
           );
         }
 
-        if (userId) {
-          filteredVideos = filteredVideos.filter(video => video.userId === userId);
-        }
-
+        // Apply sorting
         switch (sortBy) {
           case 'views':
-            filteredVideos.sort((a, b) => (b.views || 0) - (a.views || 0));
+            allVideos.sort((a, b) => (b.views || 0) - (a.views || 0));
             break;
           case 'likes':
-            filteredVideos.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+            allVideos.sort((a, b) => (b.likes || 0) - (a.likes || 0));
             break;
-          default:
-            filteredVideos.sort((a, b) => 
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            );
         }
 
-        setVideos(filteredVideos);
-        setLoading(false);
+        setVideos(allVideos);
       } catch (error) {
         console.error('Error fetching videos:', error);
+      } finally {
         setLoading(false);
       }
     };
@@ -117,6 +113,16 @@ export default function VideoList({ searchQuery, userId, sortBy = 'recent' }: Vi
     );
   }
 
+  if (videos.length === 0) {
+    return (
+      <div className="text-center py-10">
+        <h2 className="text-xl font-semibold text-gray-600">
+          {userId ? 'No videos uploaded yet' : 'No videos found'}
+        </h2>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {videos.map((video) => (
@@ -125,11 +131,12 @@ export default function VideoList({ searchQuery, userId, sortBy = 'recent' }: Vi
           id={video.id}
           title={video.title}
           userName={video.userName}
-          createdAt={video.createdAt}
           views={video.views}
           thumbnailUrl={video.thumbnailUrl}
         />
       ))}
     </div>
   );
-}
+};
+
+export default VideoList;

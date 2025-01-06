@@ -1,81 +1,78 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { useState, useEffect, useRef } from 'react';
 import VideoInteraction from './VideoInteraction';
 import Link from 'next/link';
-import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { sampleVideo, getSampleVideoViews, incrementSampleVideoViews, viewsEmitter } from '@/utils/sampleVideo';
+import { sampleVideo, incrementSampleVideoViews, getSampleVideoViews } from '@/utils/sampleVideo';
+
+interface VideoData {
+  id: string;
+  title: string;
+  userName: string;
+  userId: string;
+  views: number;
+  thumbnailUrl?: string;
+  videoUrl: string;
+  description: string;
+}
 
 interface VideoPlayerProps {
   videoId: string;
 }
 
 export default function VideoPlayer({ videoId }: VideoPlayerProps) {
-  const [videoData, setVideoData] = useState<any>(null);
+  const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [loading, setLoading] = useState(true);
+  const hasIncrementedView = useRef(false);
 
   useEffect(() => {
-    if (!viewsEmitter) return;
+    let unsubscribe: () => void;
 
-    const updateViews = (newViews: number) => {
-      if (videoData?.id === 'sample_video') {
-        setVideoData(prev => ({ ...prev, views: newViews }));
-      }
-    };
+    const handleVideo = async () => {
+      try {
+        // Reset the increment flag on each mount/refresh
+        hasIncrementedView.current = false;
 
-    viewsEmitter.on('viewsUpdated', updateViews);
-    return () => {
-      viewsEmitter.off('viewsUpdated', updateViews);
-    };
-  }, [videoData?.id]);
-
-  useEffect(() => {
-    const fetchVideo = async () => {
-      const hasViewIncremented = sessionStorage.getItem(`video_view_${videoId}`);
-      
-      if (videoId === 'sample_video') {
-        if (!hasViewIncremented) {
-          const newViews = incrementSampleVideoViews();
-          sessionStorage.setItem(`video_view_${videoId}`, 'true');
-          setVideoData({
-            ...sampleVideo,
-            views: newViews
-          });
-        } else {
+        // Handle sample video
+        if (videoId === 'sample_video') {
+          incrementSampleVideoViews();
           setVideoData({
             ...sampleVideo,
             views: getSampleVideoViews()
           });
+          setLoading(false);
+          return;
         }
-        setLoading(false);
-        return;
-      }
 
-      const videoRef = doc(db, 'videos', videoId);
-      const videoDoc = await getDoc(videoRef);
-      
-      if (videoDoc.exists()) {
-        const video = { id: videoDoc.id, ...videoDoc.data() };
-        
-        if (!hasViewIncremented) {
-          await updateDoc(videoRef, {
-            views: increment(1)
-          });
-          sessionStorage.setItem(`video_view_${videoId}`, 'true');
-          setVideoData({
-            ...video,
-            views: (video.views || 0) + 1
-          });
-        } else {
-          setVideoData(video);
-        }
+        // Set up real-time listener for regular videos
+        const videoRef = doc(db, 'videos', videoId);
+        unsubscribe = onSnapshot(videoRef, async (doc) => {
+          if (doc.exists()) {
+            const data = doc.data() as VideoData;
+            setVideoData({ id: doc.id, ...data });
+
+            // Increment view count if not already done for this component instance
+            if (!hasIncrementedView.current) {
+              hasIncrementedView.current = true;
+              await updateDoc(videoRef, { views: increment(1) });
+            }
+          }
+          setLoading(false);
+        });
+      } catch (error) {
+        console.error('Error handling video:', error);
+        setLoading(false);
       }
-      
-      setLoading(false);
     };
 
-    fetchVideo();
+    handleVideo();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [videoId]);
 
   if (loading) {
@@ -115,7 +112,7 @@ export default function VideoPlayer({ videoId }: VideoPlayerProps) {
           <div>
             <h1 className="text-2xl font-bold">{videoData.title}</h1>
             <div className="flex items-center space-x-2 mt-2">
-              <Link 
+              <Link
                 href={`/profile/${videoData.userId}`}
                 className="text-sm text-gray-600 hover:text-indigo-600 font-medium"
               >
@@ -124,10 +121,6 @@ export default function VideoPlayer({ videoId }: VideoPlayerProps) {
               <span className="text-sm text-gray-500">•</span>
               <span className="text-sm text-gray-500">
                 {videoData.views?.toLocaleString()} views
-              </span>
-              <span className="text-sm text-gray-500">•</span>
-              <span className="text-sm text-gray-500">
-                {formatDistanceToNow(new Date(videoData.createdAt))} ago
               </span>
             </div>
           </div>

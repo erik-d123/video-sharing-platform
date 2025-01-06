@@ -1,3 +1,5 @@
+// backend/scripts/resetVideos.ts
+
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, cert } from 'firebase-admin/app';
 

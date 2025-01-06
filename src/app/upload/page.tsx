@@ -1,3 +1,4 @@
+// src/app/upload/page.tsx
 'use client';
 import UploadForm from '@/components/video/UploadForm';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';

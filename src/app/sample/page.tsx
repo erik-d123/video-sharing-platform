@@ -1,3 +1,4 @@
+// src/app/sample/page.tsx
 'use client';
 
 export default function SampleVideoPage() {

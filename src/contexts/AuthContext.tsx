@@ -1,13 +1,14 @@
 'use client';
 import { createContext, useContext, useEffect, useState } from 'react';
-import { 
+import {
   User,
   signInWithPopup,
   signOut,
   onAuthStateChanged,
   GoogleAuthProvider
 } from 'firebase/auth';
-import { auth, googleProvider } from '@/lib/firebase';
+import { auth, db, googleProvider } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -26,10 +27,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Save user data to Firestore whenever they sign in or update their profile
+  const saveUserData = async (user: User) => {
+    const userRef = doc(db, 'users', user.uid);
+    await setDoc(userRef, {
+      displayName: user.displayName,
+      email: user.email,
+      photoURL: user.photoURL,
+      lastSeen: new Date().toISOString(),
+    }, { merge: true }); // merge: true will only update the specified fields
+  };
+
   useEffect(() => {
-    if (!auth) return;
-    
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        await saveUserData(user);
+      }
       setUser(user);
       setLoading(false);
     });
@@ -39,7 +52,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function loginWithGoogle() {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      await saveUserData(result.user);
     } catch (error) {
       console.error('Error signing in with Google:', error);
       throw error;

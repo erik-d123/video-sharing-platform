@@ -1,15 +1,14 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import config from './config';
 import './config/firebase-admin';
 import videosRouter from './routes/videos';
 
-dotenv.config();
-
 const app = express();
 
+// CORS configuration
 app.use(cors({
-  origin: '*',
+  origin: config.security.corsOrigin,
   credentials: true
 }));
 
@@ -22,8 +21,6 @@ app.get('/test', (req, res) => {
 
 app.use('/api/videos', videosRouter);
 
-const PORT = 3002; // Changed to 3002
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(config.port, () => {
+  console.log(`Server running on port ${config.port}`);
 });

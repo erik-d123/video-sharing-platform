@@ -1,3 +1,5 @@
+// src/app/page.tsx
+
 'use client';
 import { useState } from 'react';
 import VideoList from '@/components/video/VideoList';

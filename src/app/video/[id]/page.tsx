@@ -1,3 +1,4 @@
+// src/app/video/[id]/page.tsx
 'use client';
 import { useParams } from 'next/navigation';
 import VideoPlayer from '@/components/video/VideoPlayer';

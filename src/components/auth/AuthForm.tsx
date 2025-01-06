@@ -1,3 +1,5 @@
+// src/components/auth/AuthForm.tsx
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';

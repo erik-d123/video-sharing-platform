@@ -1,39 +1,68 @@
 import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 import { initializeApp, cert } from 'firebase-admin/app';
+import dotenv from 'dotenv';
 
-const serviceAccount = {
-  projectId: "video-sharing-platform-cc4e2",
-  clientEmail: "firebase-adminsdk-vk5g0@video-sharing-platform-cc4e2.iam.gserviceaccount.com",
-  privateKey: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCporfK2+Co+Nr8\nBbrmVZJFMehjU6ndfE+CbNh6lxXTma1aDZvhcUOG3U3MUib5rUWH5lL5lOJ7xmsG\nRNoM/cnhiuFtS7odIInrjHNspkln7RydrgQ4wrEUVA6mWGPLAAvQzS24vWCB3zwn\nZe4Ewn5fZ7JshsKMaYtbRiWmY5tHkx+XQvKhxv6xa9EpSPGkHjnFy8rwx9f7psho\nw52gcV1cLNyjiG79UZNRDaqv3aHamVqGhy+uPWGMrqmseDmq2h5SDm9RAvqyODs+\nddK1giaenCztSmclIR1l3+KQVDuUKUjXYCV1LPc5mJ/pPEe1qR+Sd8a+i8OB7Ltj\nTO6Q3kOjAgMBAAECggEAN9HtE8pNv5yABs1l5pSC+NUG6ORncZQN39esVo6v5nzb\nz9XJlSI9u7vH9XOVErTDPAh9BlbJPjyZDCuM6xh6HYcjTeFM4XfLGqERfE+tuQ6L\ny5EvH3Rla9CLL47Ha83clX1mzbM3dhT8yOQgMh3EEuXfDxo7G5RBgKvxCLMfLipA\n2V19/ij/DL16UHh/d2L/4HsRBrzmZtZHO/U5RoLVvXxyYQubbDIna1aH6z3i7Yk+\na2cFRNDRP08ecLUrShbMBtdQd9NQTWlvM4md179aepBJgN0APdYJ6KjV8Agv9aBC\nxbcXrwiIb4on1enL9HVkH+2oWMfsKTM5ySIPGnbzyQKBgQDV/I08Pcisa8vPUk49\nvSPL68JgEHmURv+zR2edG6wvI/3bPiJwWep0LbzO1/kYoenAXLTPcMId8bqGsqW0\nPgjT4ZIqA716sH4L8ekzb0x1HXZUStyOCHkpcPXf4juF3KnyhAku5CWDHv0qn2tZ\nRR4BB0/ZsnEQesuvirIW0jsUuQKBgQDK8P0ffjLJsgpzvaYzfDTlSkUiLoFtD46l\nR9zkfSXafCFCuimAW+LeF4jfw24EDLVfN5Ss5FYsSJh2GOwuE5n3KfyPk2swNuNN\nzSjrrq6zpe0oB9dla8KEVUXDxzg4k6+93PEbWkjHaxomoCam8E4Mhpytli6wwlI+\nueEMw+/lOwKBgFxJ7PvjRa4fW6pRvA7iiRLE3nMiB92MdXFzxVs7+Rnnsu+gr6e3\nD+gFZd3rxbH6+t6M3SpuXjod7C111QOUkagYLDrUnB7TCbnLHqGhSd9k0ojuNItJ\nWkAmSNTDNJq6Hc3LZk6D9S3E6rk8QkchCRy2c5jXXe4Wl8xgzAgNqY95AoGBALYX\njceYQJHhgqdfX6WKqRujjGyjNdZZwzBiTr1l3XUxM9bfmyVlTSbiDxpYDHrtvD/3\naxvGtdt+N+6fZivhwqCXt9pL+D2GwmWo1DLExlTDaQwmHQsPqbV7neGQ+80oFuRR\nPrXASNVGMGy//m6D6EQs9KB8xOAtPAa0Wk5N8Q7JAoGASKWOlyrwfJippBKO04oJ\noWfx1HUugU0pGvnljx8a58baoM79tDgqxf9w7siPCqXoIM8pbsYUWVfAaPrpoIjk\ngV6WoF67hTIaL39YLix2FiuryA/uLPc3l3Kvnarujvv/enDjOmkTXWDdICB5Nd+q\nXZvhA95O9BO49dvwbJjKReU=\n-----END PRIVATE KEY-----\n"
-};
+// Load environment variables
+dotenv.config();
 
-initializeApp({
-  credential: cert(serviceAccount as any)
+// Initialize Firebase Admin
+const app = initializeApp({
+  credential: cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+  }),
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET
 });
 
 const db = getFirestore();
+const storage = getStorage();
+const bucket = storage.bucket();
 
 async function clearAll() {
   try {
-    // Get all collections
+    console.log('Starting cleanup...');
+
+    // Collections to clear
     const collections = ['videos', 'likes', 'dislikes', 'comments'];
     
+    // Clear Firestore collections
     for (const collectionName of collections) {
+      console.log(`Clearing ${collectionName} collection...`);
       const snapshot = await db.collection(collectionName).get();
       
-      // Delete all documents in batches
-      const batch = db.batch();
-      snapshot.docs.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
+      // Process in batches of 500 (Firestore limit)
+      const batchSize = 500;
+      const batches = [];
       
-      await batch.commit();
+      for (let i = 0; i < snapshot.docs.length; i += batchSize) {
+        const batch = db.batch();
+        snapshot.docs.slice(i, i + batchSize).forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        batches.push(batch.commit());
+      }
+      
+      await Promise.all(batches);
+      console.log(`Cleared ${snapshot.docs.length} documents from ${collectionName}`);
     }
-    
-    console.log('Successfully cleared all collections');
+
+    // Clear storage
+    console.log('Clearing storage files...');
+    const [files] = await bucket.getFiles({ prefix: 'videos/' });
+    for (const file of files) {
+      await file.delete();
+    }
+    const [thumbnails] = await bucket.getFiles({ prefix: 'thumbnails/' });
+    for (const file of thumbnails) {
+      await file.delete();
+    }
+
+    console.log('Successfully cleared all data');
     process.exit(0);
   } catch (error) {
-    console.error('Error clearing collections:', error);
+    console.error('Error during cleanup:', error);
     process.exit(1);
   }
 }
