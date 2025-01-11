@@ -1,153 +1,164 @@
 # VideoShare Platform
 
-A modern, full-stack video sharing platform built with Next.js and Firebase. This platform allows users to upload, share, and interact with videos in a familiar social media format, featuring real-time updates and a responsive design.
+A full-stack video sharing platform built with Next.js and Firebase. Users can upload, share, and interact with videos through a modern, responsive interface. Features include real-time view counting, comments, and likes/dislikes, creating an engaging social media experience.
 
 ## Features
 
 - **User Authentication**
-  - Google sign-in integration
-  - Protected routes and content
-  - User profiles with uploaded videos
+  - Seamless Google sign-in integration
+  - Protected routes for authenticated users
+  - Personalized user profiles displaying uploaded videos
 
 - **Video Management**
-  - Video upload with thumbnail generation
-  - Real-time view counting
-  - Like/Dislike functionality
-  - Comment system
-  - Custom video player
+  - Direct video upload with automatic thumbnail generation
+  - Accurate real-time view counting
+  - Like/Dislike system with instant updates
+  - Interactive comment section with real-time updates
+  - Custom video player interface
 
 - **Search & Discovery**
-  - Search functionality for videos
-  - Video sorting by views, likes, and date
-  - Profile-based video filtering
+  - Instant video search functionality
+  - Multiple sorting options (views/likes/date)
+  - User profile filtering
 
-- **Real-time Updates**
-  - Live view count updates
-  - Instant like/dislike reflection
-  - Real-time comment updates
+## Getting Started
 
-## Technical Stack
+### Prerequisites
 
-### Frontend
-- Next.js 13 (App Router)
-- TypeScript
-- Tailwind CSS
-- Firebase Client SDK
+- Node.js v14 or later
+- Firebase project configured with:
+  - Authentication (Google provider enabled)
+  - Firestore Database
+  - Storage
+  - Service Account credentials
 
-### Backend
-- Node.js
-- Express
-- Firebase Admin SDK
-- TypeScript
+### Installation
 
-### Storage & Database
-- Firebase Storage (video and thumbnail storage)
-- Firestore (metadata and user data)
-- Google Cloud Platform
-
-## Prerequisites
-
-- Node.js (v14 or later)
-- npm or yarn
-- Firebase project with Storage and Firestore enabled
-- Google Cloud Platform account
-
-## Installation
-
-1. Clone the repository:
+1. Clone and set up:
 ```bash
+# Clone the repository
 git clone https://github.com/yourusername/video-sharing-platform.git
 cd video-sharing-platform
+
+# Install all dependencies from root directory
+npm run dev
 ```
 
-2. Install dependencies for both frontend and backend:
-```bash
-# Install frontend dependencies
-npm install
+2. Configure Firebase:
 
-# Install backend dependencies
-cd backend
-npm install
-```
-
-3. Set up environment variables:
-
-Frontend (.env.local):
+Create `.env.local` in root directory:
 ```env
-NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_storage_bucket
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyB7q92wEWYC7AUYPpMgoCXu4sTDKZDjQRM
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=video-sharing-platform-cc4e2.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=video-sharing-platform-cc4e2
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=video-sharing-platform-cc4e2.firebasestorage.app
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=707297759354
+NEXT_PUBLIC_FIREBASE_APP_ID=1:707297759354:web:671624a5f56b40473c6bc3
 ```
 
-Backend (.env):
+Create `.env` in backend directory:
 ```env
 PORT=3001
-FIREBASE_PROJECT_ID=your_project_id
-FIREBASE_CLIENT_EMAIL=your_client_email
-FIREBASE_PRIVATE_KEY=your_private_key
-FIREBASE_STORAGE_BUCKET=your_storage_bucket
+FIREBASE_PROJECT_ID=video-sharing-platform-cc4e2
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-vk5g0@video-sharing-platform-cc4e2.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY=your-private-key
+FIREBASE_STORAGE_BUCKET=video-sharing-platform-cc4e2.firebasestorage.app
 ```
 
-4. Start the development servers:
+### Running Locally
+
+Run the development server:
+```bash
+npm run dev
+```
+
+This starts both frontend and backend servers:
+- Frontend: [http://localhost:3000](http://localhost:3000)
+- Backend: [http://localhost:3001](http://localhost:3001)
+
+## Technical Architecture
+
+### Frontend
+- Next.js 13 with App Router
+- TypeScript for type safety
+- Tailwind CSS for styling
+- Firebase Client SDK for authentication and storage
+
+### Backend
+- Express.js server
+- Firebase Admin SDK
+- TypeScript
+- Real-time database listeners
+
+### Database & Storage
+- Firestore for storing:
+  - User profiles
+  - Video metadata
+  - Comments
+  - Like/dislike data
+- Firebase Storage for video files and thumbnails
+
+## Core Features Explained
+
+### Video Upload Process
+1. User uploads video file
+2. Automatic thumbnail generation from video
+3. File storage in Firebase Storage
+4. Metadata storage in Firestore
+
+### View Counting System
+- Real-time view updates
+- View count increments on each unique video load
+- Firestore transactions for accuracy
+
+### Comment System
+- Real-time comment updates
+- Nested comment structure
+- User information integration
+
+## Project Structure
+```
+├── backend/                  # Express server
+│   ├── src/
+│   │   ├── config/          # Firebase admin config
+│   │   ├── routes/          # API routes
+│   │   └── server.ts        # Server entry
+│   └── scripts/             # Utility scripts
+├── src/                     # Frontend source
+│   ├── app/                 # Next.js app directory
+│   ├── components/          # React components
+│   ├── contexts/            # React contexts
+│   ├── lib/                 # Firebase config
+│   └── utils/               # Utility functions
+└── public/                  # Static files
+```
+
+## Development
+
+### Available Scripts
 
 ```bash
-# Start backend server
+# Run development server
+npm run dev
+
+# Run backend only
 cd backend
 npm run dev
 
-# In a new terminal, start frontend server
-cd ..
-npm run dev
-```
-
-## Usage
-
-1. Visit `http://localhost:3000` to access the platform
-2. Sign in with Google
-3. Upload videos using the upload button in the navigation bar
-4. Interact with videos through likes, comments, and views
-5. Visit profiles to see user-specific video collections
-
-## API Endpoints
-
-### Videos
-- `GET /api/videos` - Get all videos
-- `POST /api/videos/upload-url` - Get signed URL for video upload
-- `POST /api/videos/process` - Process uploaded video
-
-### Authentication
-- Protected routes using Firebase Authentication
-- Client-side session management
-
-## Project Structure
-
-```
-├── backend/
-│   ├── src/
-│   │   ├── config/
-│   │   ├── routes/
-│   │   └── server.ts
-│   └── scripts/
-├── src/
-│   ├── app/
-│   ├── components/
-│   ├── contexts/
-│   ├── lib/
-│   └── utils/
-└── public/
+# Build for production
+npm run build
 ```
 
 ## Contributing
 
+Contributions are welcome! Please follow these steps:
+
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
 5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
