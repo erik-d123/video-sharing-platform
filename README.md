@@ -5,8 +5,7 @@ A modern, full-stack video sharing platform built with Next.js and Firebase. Thi
 ## Features
 
 - **User Authentication**
-  - Google sign-in integra
-  - tion
+  - Google sign-in integration
   - Protected routes and content
   - User profiles with uploaded videos
 
