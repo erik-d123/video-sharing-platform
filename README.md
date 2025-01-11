@@ -44,25 +44,32 @@ cd video-sharing-platform
 npm run dev
 ```
 
-2. Configure Firebase:
+2. Set up Firebase:
+   - Create a new Firebase project at [Firebase Console](https://console.firebase.google.com)
+   - Enable Authentication with Google provider
+   - Create a Firestore database
+   - Set up Firebase Storage
+   - Generate a service account key from Project Settings > Service Accounts
+
+3. Configure environment variables:
 
 Create `.env.local` in root directory:
 ```env
-NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyB7q92wEWYC7AUYPpMgoCXu4sTDKZDjQRM
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=video-sharing-platform-cc4e2.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=video-sharing-platform-cc4e2
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=video-sharing-platform-cc4e2.firebasestorage.app
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=707297759354
-NEXT_PUBLIC_FIREBASE_APP_ID=1:707297759354:web:671624a5f56b40473c6bc3
+NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
 ```
 
 Create `.env` in backend directory:
 ```env
 PORT=3001
-FIREBASE_PROJECT_ID=video-sharing-platform-cc4e2
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-vk5g0@video-sharing-platform-cc4e2.iam.gserviceaccount.com
-FIREBASE_PRIVATE_KEY=your-private-key
-FIREBASE_STORAGE_BUCKET=video-sharing-platform-cc4e2.firebasestorage.app
+FIREBASE_PROJECT_ID=your_project_id
+FIREBASE_CLIENT_EMAIL=your_service_account_email
+FIREBASE_PRIVATE_KEY=your_private_key
+FIREBASE_STORAGE_BUCKET=your_storage_bucket
 ```
 
 ### Running Locally
@@ -108,7 +115,7 @@ This starts both frontend and backend servers:
 
 ### View Counting System
 - Real-time view updates
-- View count increments on each unique video load
+- View count increments on each video load
 - Firestore transactions for accuracy
 
 ### Comment System
@@ -154,11 +161,11 @@ npm run build
 Contributions are welcome! Please follow these steps:
 
 1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
